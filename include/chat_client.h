@@ -1,17 +1,21 @@
 #ifndef CHAT_CLIENT_H
 #define CHAT_CLIENT_H
 
-#include <boost/asio.hpp>
+#include <atomic>
 #include <string>
 
 #include "chat_common.h"
+#include <boost/asio.hpp>
 
 class chat_client : public chat_common::chat_base {
 public:
-    explicit chat_client(chat_common::io_context& io_context,
-                         std::string_view host, uint16_t port);
+    explicit chat_client(chat_common::io_context& io_context, std::string_view host, uint16_t port);
 
 private:
+    // currently assumes all errors are disconnection errors
+    // TODO handle each possible error properly
+    virtual void on_error(const chat_common::error_code& ec) override;
+
     chat_common::resolver resolver_;
 };
 

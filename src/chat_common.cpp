@@ -1,86 +1,186 @@
 #include "chat_common.h"
+
 #include <sstream>
+
+#include "message.h"
+#include "terminal.h"
+
+#include <string_view>
 
 namespace chat_common {
 
-constexpr std::string_view DELIMETER = "\r\n";
+constexpr std::string_view INPUT_MARKER = ">> ";
 
 chat_base::chat_base(io_context& io_context,
-                     bool keep_alive_on_error /*= false*/)
-    : io_context_{io_context}, socket_{io_context}, keep_alive_on_error_{
-                                                        keep_alive_on_error} {}
+                     std::string_view this_name,
+                     std::string_view other_name)
+    : io_context_{io_context}
+    , socket_{io_context}
+    , closed_{false}
+    , this_name_{this_name}
+    , other_name_{other_name} {
 
-void chat_base::write_message(std::string_view message) {
-    std::ostringstream oss;
-    oss << message << DELIMETER;
-    boost::asio::post(io_context_, [this, msg = oss.str()]() {
-        bool write_in_progress = !pending_msgs_.empty();
-        pending_msgs_.emplace_back(std::move(msg));
-        if (!write_in_progress) {
-            send_message();
+    info("Use \\exit to exit the application");
+}
+
+chat_base::~chat_base() {
+    if (!is_closed()) {
+        close();
+    }
+}
+
+void chat_base::close() {
+    boost::asio::post(io_context_, [this]() { socket_.close(); });
+    closed_.store(true);
+}
+
+bool chat_base::is_closed() const {
+    return closed_;
+}
+
+void chat_base::append_to_buffer(char c) {
+    std::scoped_lock lock{mutex_};
+    current_msg_.push_back(c);
+    terminal::write(c);
+}
+
+void chat_base::pop_from_buffer() {
+    std::scoped_lock lock{mutex_};
+    if (current_msg_.empty()) {
+        return;
+    }
+    current_msg_.pop_back();
+    terminal::backspace();
+}
+
+void chat_base::enter() {
+    std::scoped_lock lock{mutex_};
+
+    // block empty input
+    // TODO consider blocking blank input?
+    if (current_msg_.empty()) {
+        return;
+    }
+    // we can extend checking for more commands here
+    // for now we just hardcode "\exit" to be our exit command
+    if (current_msg_ == R"(\exit)") {
+        close();
+    } else {
+        terminal::clearln();
+        terminal::write(this_name_);
+        terminal::write(": ");
+        terminal::writeln(current_msg_);
+        terminal::write(INPUT_MARKER);
+        prepare_message(message::make_message(current_msg_));
+    }
+    current_msg_.clear();
+}
+
+void chat_base::info(std::string_view info) {
+    std::scoped_lock lock{mutex_};
+    terminal::clearln();
+    terminal::write("[INFO]: ");
+    terminal::writeln(info);
+    terminal::write(INPUT_MARKER);
+    terminal::write(std::string_view{current_msg_});
+}
+
+void chat_base::write_incoming_message(std::string_view msg) {
+    std::scoped_lock lock{mutex_};
+    terminal::clearln();
+    terminal::write(other_name_);
+    terminal::write(": ");
+    terminal::writeln(msg);
+    terminal::write(INPUT_MARKER);
+    terminal::write(std::string_view{current_msg_});
+}
+
+void chat_base::receive_message() {
+    boost::asio::async_read_until(socket_,
+                                  buffer_,
+                                  DELIMETER,
+                                  [this](error_code ec, std::size_t length) {
+                                      if (!ec) {
+                                          // obtain payload from buffer
+                                          std::istream is(&buffer_);
+                                          std::string payload;
+                                          std::getline(is, payload);
+                                          // payload should have length - 1 bytes, since
+                                          // \r (CR) character is culled by std::getline
+                                          const auto msg = message::decode(payload, length);
+                                          const auto type = msg.type();
+                                          if (type == message::ACK) {
+                                              // TODO id each sent msg and match ack to msgs by id
+                                              if (!pending_ack_msgs_.empty()) {
+                                                  info(pending_ack_msgs_.front().acked_string());
+                                                  pending_ack_msgs_.pop_front();
+                                              } // TODO handle unmatched acknowledgement
+                                          } else if (type == message::MSG) {
+                                              write_incoming_message(msg.to_string());
+                                              acknowledge();
+                                          }
+                                          receive_message();
+
+                                      } else {
+                                          on_error(ec);
+                                      }
+                                  });
+}
+
+void chat_base::connect_endpoint(endpoints endpoints) {
+    boost::asio::async_connect(socket_, endpoints, [this](error_code ec, endpoint ep) {
+        if (!ec) {
+            std::string msg;
+            std::ostringstream oss{msg};
+            oss << "Successfully connected to " << ep;
+            info(oss.str());
+            receive_message();
+        } else {
+            on_error(ec);
         }
     });
 }
 
-void chat_base::connect_endpoint(endpoints endpoints) {
-    boost::asio::async_connect(
-        socket_, endpoints, [this](boost::system::error_code ec, endpoint ep) {
-            if (!ec) {
-                std::cout << "Successfully connected to " << ep << std::endl;
-                receive_message();
-            } else {
-                std::cerr << "Failed to connect"
-                          << ", Error code: " << ec.message() << std::endl;
-            }
-        });
+void chat_base::on_error(const error_code& ec) {
+    info(ec.message());
 }
 
-void chat_base::set_socket(socket socket) { socket_ = std::move(socket); }
-
-void chat_base::close() {
-    boost::asio::post(io_context_, [this]() { socket_.close(); });
-}
-
-void chat_base::receive_message() {
-    boost::asio::async_read_until(
-        socket_, buffer_, "\r\n",
-        [this](boost::system::error_code ec, std::size_t length) {
-            if (!ec) {
-                std::istream is(&buffer_);
-                std::string line;
-                std::getline(is, line);
-                std::cout.write(line.data(), length);
-                std::cout << "\n";
-                receive_message();
-            } else {
-                if (!keep_alive_on_error_) {
-                    socket_.close();
-                }
-                std::cerr << "Failed to receive: " << ec.message() << std::endl;
-            }
-        });
+void chat_base::acknowledge() {
+    boost::asio::async_write(socket_,
+                             boost::asio::buffer(message::make_acknowledgement().payload()),
+                             [this](error_code ec, std::size_t length) {
+                                 if (ec) {
+                                     on_error(ec);
+                                 }
+                             });
 }
 
 void chat_base::send_message() {
-    boost::asio::async_write(
-        socket_,
-        boost::asio::buffer(pending_msgs_.front().data(),
-                            pending_msgs_.front().length()),
-        [this](boost::system::error_code ec, std::size_t) {
-            const std::string msg = std::move(pending_msgs_.front());
-            if (!ec) {
-                pending_msgs_.pop_front();
-                if (!pending_msgs_.empty()) {
-                    send_message();
-                }
-                std::cout << "Successfully sent: " << msg << std::endl;
-            } else {
-                if (!keep_alive_on_error_) {
-                    socket_.close();
-                }
-                std::cerr << "Failed to send: " << msg << std::endl;
-            }
-        });
+    boost::asio::async_write(socket_,
+                             boost::asio::buffer(pending_send_msgs_.front().payload()),
+                             [this](error_code ec, std::size_t) {
+                                 if (!ec) {
+                                     auto sent_msg = std::move(pending_send_msgs_.front());
+                                     pending_send_msgs_.pop_front();
+                                     sent_msg.set_sent_time();
+                                     pending_ack_msgs_.emplace_back(std::move(sent_msg));
+                                     if (!pending_send_msgs_.empty()) {
+                                         send_message();
+                                     }
+                                 } else {
+                                     on_error(ec);
+                                 }
+                             });
+}
+
+void chat_base::prepare_message(message message) {
+    boost::asio::post(io_context_, [this, msg = std::move(message)]() {
+        bool write_in_progress = !pending_send_msgs_.empty();
+        pending_send_msgs_.emplace_back(std::move(msg));
+        if (!write_in_progress) {
+            send_message();
+        }
+    });
 }
 
 } // namespace chat_common
