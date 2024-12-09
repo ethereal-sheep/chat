@@ -69,7 +69,6 @@ void terminal::enable_raw_mode() {
 }
 
 terminal::input_event make_printable(char c) {
-    assert(std::isprint(c));
     terminal::input_event event;
     event.ctrl = false;
     event.enter = false;
@@ -90,7 +89,6 @@ terminal::input_event make_backspace() {
 }
 
 terminal::input_event make_ctrl(char c) {
-    assert(1 <= c && c <= 26);
     terminal::input_event event;
     event.ctrl = true;
     event.enter = c == 13; // enter shares 13 with ctrl-m
