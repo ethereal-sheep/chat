@@ -6,7 +6,7 @@ A 1-to-1 chat application written in `c++20`, built with `boost::asio`.
 
 Install `chat` with cmake. Running the below commands should build the `chat` application into the `build` directory.
 
-NOTE: Make sure `boost` has been installed on your system.
+NOTE: Make sure `boost` has been installed on your system. I use `boost:1.84.0`.
 
 ```bash
 cd chat
