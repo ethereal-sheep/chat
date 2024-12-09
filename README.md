@@ -1,4 +1,4 @@
-# Chat for ahrefs
+# Chat
 
 A 1-to-1 chat application written in `c++20`, built with `boost::asio`.
 
