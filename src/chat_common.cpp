@@ -1,10 +1,9 @@
 #include "chat_common.h"
 
-#include <sstream>
-
 #include "message.h"
 #include "terminal.h"
 
+#include <sstream>
 #include <string_view>
 
 namespace chat_common {
@@ -24,14 +23,14 @@ chat_base::chat_base(io_context& io_context,
 }
 
 chat_base::~chat_base() {
-    if (!is_closed()) {
-        close();
-    }
+    close();
 }
 
 void chat_base::close() {
-    boost::asio::post(io_context_, [this]() { socket_.close(); });
-    closed_.store(true);
+    if (!is_closed()) {
+        boost::asio::post(io_context_, [this]() { socket_.close(); });
+        closed_.store(true);
+    }
 }
 
 bool chat_base::is_closed() const {

@@ -1,12 +1,12 @@
 #ifndef CHAT_SERVER_H
 #define CHAT_SERVER_H
 
+#include "chat_common.h"
+
 #include <atomic>
+#include <boost/asio.hpp>
 #include <functional>
 #include <memory>
-
-#include "chat_common.h"
-#include <boost/asio.hpp>
 
 class chat_server : public chat_common::chat_base {
 public:

@@ -13,7 +13,7 @@ concept Streamable = requires(std::ostream os, T value) {
 
 namespace terminal {
 // currently only supporting printable chars, ctrl a-z, enter, and backspace
-// multi-bytes wide keys like arrow keys won't be handled,
+// multi-bytes wide chars like arrow keys and unicode encoding won't be handled
 // but it's something to consider for the future
 struct input_event {
     bool ctrl;

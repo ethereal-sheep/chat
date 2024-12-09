@@ -1,8 +1,8 @@
 #include "chat_client.h"
 
-#include <iostream>
-
 #include "chat_common.h"
+
+#include <iostream>
 
 chat_client::chat_client(chat_common::io_context& io_context_,
                          std::string_view host_ip,

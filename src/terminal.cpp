@@ -1,14 +1,13 @@
 #include "terminal.h"
 
 #include <cctype>
+#include <ctype.h>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
-#include <string>
-
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <termios.h>
 #include <unistd.h>
 
@@ -109,7 +108,8 @@ void terminal::poll_for_input(std::function<void(input_event)> event_handler,
     while (true) {
         char c = '\0';
         if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) {
-            throw std::runtime_error("failed on read");
+            terminal::writeln("failed on read");
+            break;
         }
 
         // do not bother continuing

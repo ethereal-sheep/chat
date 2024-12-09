@@ -1,8 +1,8 @@
 #include "chat_server.h"
 
-#include <sstream>
-
 #include "chat_common.h"
+
+#include <sstream>
 
 chat_server::chat_server(chat_common::io_context& io_context, uint16_t port)
     : chat_common::chat_base{io_context, "SERVER", "CLIENT"}
@@ -14,15 +14,19 @@ chat_server::chat_server(chat_common::io_context& io_context, uint16_t port)
 }
 
 void chat_server::close() {
-    chat_common::chat_base::close();
-    boost::asio::post(io_context_, [this]() { acceptor_.close(); });
+    if (!is_closed()) {
+        chat_common::chat_base::close();
+        boost::asio::post(io_context_, [this]() { acceptor_.close(); });
+    }
 }
 
 void chat_server::on_error(const chat_common::error_code&) {
     // assume error occurs on disconnect, extend robustness in future
     if (!is_closed()) {
-        info("Client disconnected; Waiting for connection...");
-        boost::asio::post(io_context_, [this]() { socket_.close(); });
+        boost::asio::post(io_context_, [this]() {
+            socket_.close();
+            info("Client disconnected; Waiting for connection...");
+        });
     }
 }
 

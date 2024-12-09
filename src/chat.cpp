@@ -1,14 +1,14 @@
-#include <iostream>
-#include <memory>
-#include <stdexcept>
-
-#include "message.h"
-#include "terminal.h"
-
 #include "chat_client.h"
 #include "chat_common.h"
 #include "chat_server.h"
+#include "message.h"
+#include "terminal.h"
+
+#include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <string_view>
+#include <thread>
 
 constexpr std::string_view USAGE = "Usage: chat <server|client [ip]>";
 constexpr std::string_view DEFAULT_HOST = "127.0.0.1";
@@ -65,6 +65,8 @@ int main(int argc, char** argv) {
         chat->close();
         t.join();
     } catch (const std::exception& e) {
+        // TODO handle "address in use" error
+        terminal::clearln();
         terminal::writeln(e.what());
         return 1;
     }

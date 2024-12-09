@@ -1,11 +1,11 @@
 #ifndef CHAT_CLIENT_H
 #define CHAT_CLIENT_H
 
-#include <atomic>
-#include <string>
-
 #include "chat_common.h"
+
+#include <atomic>
 #include <boost/asio.hpp>
+#include <string>
 
 class chat_client : public chat_common::chat_base {
 public:

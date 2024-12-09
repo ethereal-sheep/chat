@@ -1,14 +1,13 @@
 #ifndef CHAT_COMMON_H
 #define CHAT_COMMON_H
 
-#include <deque>
-#include <iostream>
-#include <string>
-
 #include "message.h"
 #include "terminal.h"
 
 #include <boost/asio.hpp>
+#include <deque>
+#include <iostream>
+#include <string>
 #include <string_view>
 
 namespace chat_common {

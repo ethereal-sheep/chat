@@ -4,9 +4,8 @@
 #include <optional>
 #include <sstream>
 
-#include <__chrono/duration.h>
-
 namespace chat_common {
+
 message message::make_message(std::string_view msg) {
     return message(msg, MSG);
 }
