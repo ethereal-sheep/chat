@@ -8,7 +8,6 @@
 namespace chat_common {
 
 constexpr std::string_view DELIMETER = "\r\n";
-constexpr std::string_view ACKNOWLEDGE = "ACK\1";
 
 /**
 message class which represents the payload passed between the sockets
@@ -21,17 +20,20 @@ public:
 
     // TODO may extend to support cross network commands
     // kill client, queries, healthchecks, etc
-    enum message_type { ACK = 0, MSG };
+    enum message_type { ACK = 1, MSG = 2 };
 
     /* factory functions */
     static message make_message(std::string_view msg);
     static message make_acknowledgement();
-    // decodes a payload into a message,
-    // TODO extend to support header info
-    static message decode(std::string_view payload, size_t length);
+    // purely for debugging purposes, makes a message that will fail decoding
+    static message make_unsupported() {
+        return message("", static_cast<message_type>(3));
+    }
+    // decodes a payload into a message
+    // TODO extend header info to include message id so we can ACK the correct msg
+    static std::optional<message> decode(std::string_view payload, size_t length);
 
     /* getter functions */
-    // TODO extend to support header info
     std::string payload() const;
     std::string to_string() const;
     std::string acked_string() const;

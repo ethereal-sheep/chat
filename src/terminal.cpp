@@ -11,61 +11,40 @@
 #include <termios.h>
 #include <unistd.h>
 
-class raw_mode_impl {
-public:
-    raw_mode_impl() {
-        enable_raw_mode();
+termios original_;
+
+/**
+Tutorial and explanation here:
+https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
+
+High level idea is to:
+1. disable canonical mode so that we can read bytes directly on input
+2. disable terminate and suspend signals so that we can end gracefully
+3. disable echoing so that we can properly display our chat messages
+
+We do this so that we have greater control on how text is written to
+the terminal, as well as how we capture user input.
+ */
+void terminal::enable_raw_mode() {
+    if (tcgetattr(STDIN_FILENO, &original_) == -1) {
+        throw std::runtime_error("failed on tcgetattr");
     }
-    ~raw_mode_impl() {
-        disable_raw_mode();
+    std::atexit(terminal::disable_raw_mode);
+
+    termios raw = original_;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 1;
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+        throw std::runtime_error("failed on tcsetattr");
     }
-
-    /**
-    Tutorial and explanation here:
-    https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
-
-    High level idea is to:
-    1. disable canonical mode so that we can read bytes directly on input
-    2. disable terminate and suspend signals so that we can end gracefully
-    3. disable echoing so that we can properly display our chat messages
-
-    We do this so that we have greater control on how text is written to
-    the terminal, as well as how we capture user input.
-     */
-    void enable_raw_mode() {
-        if (tcgetattr(STDIN_FILENO, &original_) == -1) {
-            throw std::runtime_error("failed on tcgetattr");
-        }
-        termios raw = original_;
-        raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-        raw.c_oflag &= ~(OPOST);
-        raw.c_cflag |= (CS8);
-        raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-        raw.c_cc[VMIN] = 0;
-        raw.c_cc[VTIME] = 1;
-        if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
-            throw std::runtime_error("failed on tcsetattr");
-        }
-    }
-
-    void disable_raw_mode() {
-        tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_);
-    }
-
-private:
-    termios original_;
-};
-
-// use pimpl + meyer singleton idiom to enable raw mode throught program lifetime
-// only when program is complete then we turn off raw mode
-raw_mode_impl& get_raw_mode_impl() {
-    static raw_mode_impl impl;
-    return impl;
 }
 
-// can be extended to allow disabling raw mode, but not needed for this program
-void terminal::enable_raw_mode() {
-    get_raw_mode_impl();
+void terminal::disable_raw_mode() {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_);
 }
 
 terminal::input_event make_printable(char c) {
@@ -129,7 +108,9 @@ void terminal::poll_for_input(std::function<void(input_event)> event_handler,
         } else if (c == 127) {
             // backspace character
             event_handler(make_backspace());
-        }
+        } // TODO implement utf-8 encoding
+        // non-trivial since we provide backspace feature
+
         // ignore everything else
 
         // try to replicate SIGINT behavior by breaking the poll here

@@ -60,18 +60,36 @@ void chat_base::enter() {
     if (current_msg_.empty()) {
         return;
     }
+
+    // clear the current msg in terminal
+    terminal::clearln();
+
     // we can extend checking for more commands here
     // for now we just hardcode "\exit" to be our exit command
     if (current_msg_ == R"(\exit)") {
         close();
+    } else if (current_msg_ == R"(\bad)") {
+        // debug purposes only, sends a bad message
+        // TODO hide behind feature flag
+        if (socket_.is_open()) {
+            terminal::writeln("[INFO]: Sending bad message!");
+            prepare_message(message::make_unsupported());
+        }
     } else {
-        terminal::clearln();
-        terminal::write(this_name_);
-        terminal::write(": ");
-        terminal::writeln(current_msg_);
-        terminal::write(INPUT_MARKER);
-        prepare_message(message::make_message(current_msg_));
+        // if socket is closed, no point preparing a message
+        if (socket_.is_open()) {
+            terminal::write(this_name_);
+            terminal::write(": ");
+            terminal::writeln(current_msg_);
+            prepare_message(message::make_message(current_msg_));
+        } else {
+            terminal::writeln("[INFO]: No connection!");
+        }
     }
+
+    // we do this here for the case where there are no connections
+    // but user tries to send a msg anyways
+    terminal::write(INPUT_MARKER);
     current_msg_.clear();
 }
 
@@ -104,10 +122,17 @@ void chat_base::receive_message() {
                                           std::istream is(&buffer_);
                                           std::string payload;
                                           std::getline(is, payload);
-                                          // payload should have length - 1 bytes, since
+                                          // note: payload has length - 1 bytes, since
                                           // \r (CR) character is culled by std::getline
                                           const auto msg = message::decode(payload, length);
-                                          const auto type = msg.type();
+                                          if (!msg) {
+                                              // bad message
+                                              info("Bad message from sender!");
+                                              receive_message();
+                                              return;
+                                          }
+
+                                          const auto type = msg->type();
                                           if (type == message::ACK) {
                                               // TODO id each sent msg and match ack to msgs by id
                                               if (!pending_ack_msgs_.empty()) {
@@ -115,7 +140,7 @@ void chat_base::receive_message() {
                                                   pending_ack_msgs_.pop_front();
                                               } // TODO handle unmatched acknowledgement
                                           } else if (type == message::MSG) {
-                                              write_incoming_message(msg.to_string());
+                                              write_incoming_message(msg->to_string());
                                               acknowledge();
                                           }
                                           receive_message();

@@ -13,7 +13,7 @@ include(FetchContent)
 # FetchContent_Declare(
 #   Boost
 #   GIT_REPOSITORY https://github.com/boostorg/boost.git
-#   GIT_TAG boost-1.86.0
+#   GIT_TAG boost-1.84.0
 #   GIT_SHALLOW TRUE
 # )
 # FetchContent_MakeAvailable(Boost)
@@ -33,16 +33,19 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 include_directories(include)
+# lib 
+add_library(lib_chat src/chat_client.cpp src/chat_server.cpp src/chat_common.cpp src/message.cpp src/terminal.cpp)
+target_link_libraries(lib_chat Boost::system)
 
 # bin
-add_executable(chat src/chat.cpp src/chat_client.cpp src/chat_server.cpp src/chat_common.cpp src/message.cpp src/terminal.cpp)
-target_link_libraries(chat Boost::system)
+add_executable(chat src/chat.cpp)
+target_link_libraries(chat lib_chat)
 
 # test
 enable_testing()
 
-add_executable(test_chat test/test_message.cpp src/message.cpp)
-target_link_libraries(test_chat GTest::gtest_main)
+add_executable(test_chat test/test_message.cpp)
+target_link_libraries(test_chat GTest::gtest_main lib_chat)
 
 include(GoogleTest)
 gtest_discover_tests(test_chat)

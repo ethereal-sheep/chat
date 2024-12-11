@@ -15,6 +15,7 @@ namespace terminal {
 // currently only supporting printable chars, ctrl a-z, enter, and backspace
 // multi-bytes wide chars like arrow keys and unicode encoding won't be handled
 // but it's something to consider for the future
+// TODO support utf-8 and arrow key events
 struct input_event {
     bool ctrl;
     bool enter;
@@ -25,6 +26,9 @@ struct input_event {
 
 // enables raw mode (do not echo, capture input immediately, etc.)
 void enable_raw_mode();
+
+// disables raw mode, returns terminal to canonical mode
+void disable_raw_mode();
 
 // polls for input;
 // calls event_handler on input event;

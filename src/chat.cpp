@@ -10,7 +10,8 @@
 #include <string_view>
 #include <thread>
 
-constexpr std::string_view USAGE = "Usage: chat <server|client [ip]>";
+constexpr std::string_view USAGE_STRING =
+    "Usage: chat <server|client [ip]>; default ip is localhost";
 constexpr std::string_view DEFAULT_HOST = "127.0.0.1";
 
 std::unique_ptr<chat_common::chat_base> handle_clargs(chat_common::io_context& io_context,
@@ -43,7 +44,7 @@ int main(int argc, char** argv) {
         chat_common::io_context io_context;
         const auto chat = handle_clargs(io_context, argc, argv);
         if (!chat) {
-            terminal::writeln(USAGE);
+            terminal::writeln(USAGE_STRING);
             return 1;
         }
 

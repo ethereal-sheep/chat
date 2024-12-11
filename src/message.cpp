@@ -6,20 +6,32 @@
 
 namespace chat_common {
 
+// for now, just use one byte to store the type
+constexpr size_t HEADER_LENGTH = 1;
+
 message message::make_message(std::string_view msg) {
     return message(msg, MSG);
 }
 
 message message::make_acknowledgement() {
-    return message(ACKNOWLEDGE, ACK);
+    return message("", ACK);
 }
 
-message message::decode(std::string_view payload, size_t length) {
+std::optional<message> message::decode(std::string_view payload, size_t length) {
     payload = payload.substr(0, length - DELIMETER.length());
-    if (payload == ACKNOWLEDGE) {
-        return make_acknowledgement();
+    const auto header = payload.substr(0, HEADER_LENGTH);
+    if (header.length() < HEADER_LENGTH) {
+        // corrupted payload
+        return {};
     }
-    return make_message(payload);
+    const auto first_byte = static_cast<int>(header.front());
+    if (first_byte == ACK) {
+        return make_acknowledgement();
+    } else if (first_byte == MSG) {
+        return make_message(payload.substr(HEADER_LENGTH));
+    }
+
+    return {};
 }
 
 message::message(std::string_view msg, message_type type)
@@ -30,7 +42,7 @@ message::message(std::string_view msg, message_type type)
 
 std::string message::payload() const {
     std::ostringstream oss;
-    oss << payload_ << DELIMETER;
+    oss << static_cast<char>(type_) << payload_ << DELIMETER;
     return oss.str();
 }
 
