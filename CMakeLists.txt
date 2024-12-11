@@ -33,6 +33,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 include_directories(include)
+
 # lib 
 add_library(lib_chat src/chat_client.cpp src/chat_server.cpp src/chat_common.cpp src/message.cpp src/terminal.cpp)
 target_link_libraries(lib_chat Boost::system)
