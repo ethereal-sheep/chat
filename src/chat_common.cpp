@@ -126,8 +126,9 @@ void chat_base::receive_message() {
                                           // \r (CR) character is culled by std::getline
                                           const auto msg = message::decode(payload, length);
                                           if (!msg) {
-                                              // bad message
+                                              // bad message; acknowledge anyway
                                               info("Bad message from sender!");
+                                              acknowledge();
                                               receive_message();
                                               return;
                                           }
