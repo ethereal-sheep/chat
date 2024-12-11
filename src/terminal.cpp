@@ -44,7 +44,7 @@ void terminal::enable_raw_mode() {
 }
 
 void terminal::disable_raw_mode() {
-    writeln("");
+    clearln();
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_);
 }
 
